@@ -1,25 +1,36 @@
-from flask import Flask, request, render_template, jsonify
-import pandas as pd
+from flask import Flask, request, jsonify, render_template
+from utils import MedicineRecommender
+import os
 
 app = Flask(__name__)
-data = pd.read_csv('data/preprocessed_medicines.csv')
 
-@app.route('/')
-def home():
-    return render_template('index.html')
+# Initialize the recommender
+if os.path.exists('models/conditions.pkl'):
+    # Load existing model
+    recommender = MedicineRecommender.load_model()
+else:
+    # Create and save new model
+    recommender = MedicineRecommender()
+    recommender.load_data('/Users/jihadgarti/Desktop/github-path/Medicine-Recommendation-System/app/data/preprocessed_medicines.csv')
+    recommender.save_model()
 
 @app.route('/recommend', methods=['POST'])
 def recommend():
-    # Get user input
-    symptoms = request.form['symptoms'].lower().split()
+    data = request.get_json()
+    symptoms = data.get('symptoms')
+    
+    if not symptoms:
+        return jsonify({'error': 'No symptoms provided'}), 400
+    
+    try:
+        recommendations = recommender.get_recommendations_from_symptoms(symptoms)
+        return jsonify({'results': recommendations})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
-    # Filter medicines matching symptoms
-    recommendations = []
-    for _, row in data.iterrows():
-        if any(symptom in row['Keywords'] for symptom in symptoms):
-            recommendations.append(row)
-
-    return render_template('results.html', recommendations=recommendations)
+@app.route('/')
+def index():
+    return render_template('index.html')
 
 if __name__ == '__main__':
     app.run(debug=True)

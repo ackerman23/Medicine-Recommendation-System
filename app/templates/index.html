@@ -1,14 +1,137 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Medicine Recommendation</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medicine Recommender</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .loading {
+            display: none;
+        }
+        .loading.active {
+            display: block;
+        }
+    </style>
 </head>
-<body>
-    <h1>Welcome to Medicine Recommendation System</h1>
-    <form action="/recommend" method="post">
-        <label for="symptoms">Enter Your Symptoms:</label>
-        <input type="text" name="symptoms" id="symptoms">
-        <button type="submit">Find Medicines</button>
-    </form>
+<body class="bg-gray-100 min-h-screen p-8">
+    <div class="max-w-3xl mx-auto">
+        <h1 class="text-3xl font-bold text-center mb-8 text-blue-600">Medicine Recommender System</h1>
+        
+        <!-- Input Form -->
+        <div class="bg-white p-6 rounded-lg shadow-md mb-8">
+            <form id="symptomForm" class="space-y-4">
+                <div>
+                    <label for="symptoms" class="block text-sm font-medium text-gray-700 mb-2">
+                        Describe your symptoms:
+                    </label>
+                    <textarea 
+                        id="symptoms" 
+                        name="symptoms" 
+                        rows="4" 
+                        class="w-full p-3 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Example: I have a headache and fever..."
+                    ></textarea>
+                </div>
+                <button 
+                    type="submit" 
+                    class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition duration-200"
+                >
+                    Get Recommendations
+                </button>
+            </form>
+        </div>
+
+        <!-- Loading Indicator -->
+        <div id="loading" class="loading text-center py-4">
+            <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <p class="mt-2 text-gray-600">Analyzing symptoms...</p>
+        </div>
+
+        <!-- Results Section -->
+        <div id="results" class="space-y-6"></div>
+    </div>
+
+    <script>
+        document.getElementById('symptomForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const symptoms = document.getElementById('symptoms').value.trim();
+            if (!symptoms) {
+                alert('Please enter your symptoms');
+                return;
+            }
+
+            // Show loading
+            const loading = document.getElementById('loading');
+            const results = document.getElementById('results');
+            loading.classList.add('active');
+            results.innerHTML = '';
+
+            try {
+                const response = await fetch('/recommend', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ symptoms }),
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    displayResults(data.results);
+                } else {
+                    throw new Error(data.error || 'Failed to get recommendations');
+                }
+            } catch (error) {
+                results.innerHTML = `
+                    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded">
+                        Error: ${error.message}
+                    </div>
+                `;
+            } finally {
+                loading.classList.remove('active');
+            }
+        });
+
+        function displayResults(results) {
+            const resultsDiv = document.getElementById('results');
+            
+            if (!results.length) {
+                resultsDiv.innerHTML = `
+                    <div class="bg-yellow-100 border border-yellow-400 text-yellow-700 px-4 py-3 rounded">
+                        No recommendations found for these symptoms.
+                    </div>
+                `;
+                return;
+            }
+
+            const html = results.map((result, index) => `
+                <div class="bg-white p-6 rounded-lg shadow-md">
+                    <h2 class="text-xl font-semibold text-blue-600 mb-2">
+                        Possible Condition ${index + 1}: ${result.condition}
+                    </h2>
+                    <p class="text-gray-600 mb-4">
+                        Confidence: ${(result.confidence * 100).toFixed(1)}%
+                    </p>
+                    
+                    <h3 class="font-medium text-gray-700 mb-2">Recommended Medicines:</h3>
+                    <div class="space-y-4">
+                        ${result.recommendations.map(med => `
+                            <div class="border-l-4 border-blue-200 pl-4">
+                                <div class="font-medium">${med.medicine}</div>
+                                <div class="text-sm text-gray-600">Match Score: ${(med.similarity_score * 100).toFixed(1)}%</div>
+                                <div class="text-sm text-gray-600">Uses: ${med.uses}</div>
+                                <div class="text-sm text-gray-600">Composition: ${med.composition}</div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `).join('');
+
+            resultsDiv.innerHTML = html;
+        }
+    </script>
 </body>
 </html>
